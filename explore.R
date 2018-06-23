@@ -81,16 +81,17 @@ barplot(prop.table(table(round(patients$Length_of_Stay_day,0))),
 rexp(20, rate = 1/mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min))
 
 
-
-#leave_date
+######################################
+#Conteggio stima pazienti oraria
+######################################
 rdu<-function(n, min, max){sample(min:max,n,replace=T)}
 
 
 patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in recovery
-                           minutes((patients$Length_of_Stay_day*24+rdu(1, 1, 24))*60) #stima los in minuti
+                           minutes((patients$Length_of_Stay_day*24+rdu(1, 1, 6))*60) #stima los in minuti
 
 hour_series = seq(ymd_hms('2015-01-01 00:00:00'),ymd_hms('2015-10-31 23:00:00'), by = 'hour')  
-final = data.frame(date_time = hour_series)
+final_2 = data.frame(date_time = hour_series)
 
 
 for (i in seq_along(final$date_time)){
@@ -125,3 +126,15 @@ for (i in seq_along(final$date_time)){
 
 plot(final$n_patient_im_in+final$n_patient_other_in, type="l")
 abline(h = 19, col=2)
+
+check = final %>% filter(hour(final$date_time)==23)
+check$date = ymd(floor_date(check$date_time, unit = c("day")))
+check$recovery = check$n_patient_im_in+check$n_patient_other_in
+check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
+
+sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
+
+sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
+
+plot(check$recovery, type="l", lwd = 2, lambda=0.9)
+lines(historical_info$patients,col="blue")
