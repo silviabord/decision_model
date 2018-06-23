@@ -90,7 +90,7 @@ patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in recovery
                            minutes((patients$Length_of_Stay_day*24+rdu(1, 1, 24))*60) #stima los in minuti
 
 hour_series = seq(ymd_hms('2015-01-01 00:00:00'),ymd_hms('2015-10-31 23:00:00'), by = 'hour')  
-final_2 = data.frame(date_time = hour_series)
+final = data.frame(date_time = hour_series)
 
 
 for (i in seq_along(final$date_time)){
