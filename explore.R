@@ -1,3 +1,6 @@
+library("lubridate", lib.loc="C:/Program Files/R/R-3.3.1/library")
+library("dplyr", lib.loc="C:/Program Files/R/R-3.3.1/library")
+library("reshape2", lib.loc="C:/Program Files/R/R-3.3.1/library")
 ######################################
 #import data
 ######################################
@@ -36,35 +39,6 @@ min(patients$Arrival_Date)
 
 
 
-
-#considero quelli arrivati dopo le 12 come arrivati il giorno dopo 
-#ma non li conto se lunghezza permanenza=0 days
-check = patients %>%
-  filter(Length_of_Stay_day != 0 & Section=="8000595") %>%
-  group_by(bed_date) %>%
-  summarise( patient_number = n()) 
-check_2= merge(check,  historical_info, by.x = "bed_date", by.y = "Date")
-sum((check_2$patient_number-check_2$patients)^2)/dim(check_2)[1]
-sum(abs(check_2$patient_number-check_2$patients))/dim(check_2)[1]
-
-#considero quelli arrivati dopo le 12 come arrivati il giorno dopo 
-check = patients %>% 
-  filter(Section=="8000595") %>%
-  group_by(bed_date) %>% summarise( patient_number = n()) 
-check_2= merge(check,  historical_info, by.x = "bed_date", by.y = "Date")
-sum((check_2$patient_number-check_2$patients)^2)/dim(check_2)[1]
-sum(abs(check_2$patient_number-check_2$patients))/dim(check_2)[1]
-
-#considero quelli arrivati dopo le 12 normalmente 
-check = patients  %>% 
-  filter(Section=="8000595") %>%
-  group_by(arrival_date) %>% summarise( patient_number = n()) 
-check_2= merge(check,  historical_info, by.x = "arrival_date", by.y = "Date")
-sqrt(sum((check_2$patient_number-check_2$patients)^2)/dim(check_2)[1])
-sum(abs(check_2$patient_number-check_2$patients))/dim(check_2)[1]
-
-
-
 # che cazzo sono other other
 table(patients$Section, patients$Surgery_Type)
 
@@ -86,37 +60,38 @@ rexp(20, rate = 1/mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min))
 ######################################
 rdu<-function(n, min, max){sample(min:max,n,replace=T)}
 
-
+set.seed(1234)
 patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in recovery
-                           minutes((patients$Length_of_Stay_day*24+rdu(1, 1, 6))*60) #stima los in minuti
+                           minutes((patients$Length_of_Stay_day*24+
+                                      rdu(1,1,8))*60) #stima los in minuti
 
-hour_series = seq(ymd_hms('2015-01-01 00:00:00'),ymd_hms('2015-10-31 23:00:00'), by = 'hour')  
-final_2 = data.frame(date_time = hour_series)
+hour_series = seq(ymd_hms('2015-01-02 00:00:00'),ymd_hms('2015-02-28 23:00:00'), by = 'hour')  
+final = data.frame(date_time = hour_series)
 
 
 for (i in seq_along(final$date_time)){
   j = final$date_time[i]
   final[i,"n_patient_im_in"] = patients %>%
-                     filter(arrival_date_time < j & leave_date_time > j &
-                              Surgery_Type == "Internal_Medicine" &
+    filter(arrival_date_time <= j & leave_date_time > j &
+             Surgery_Type == "Internal_Medicine" &
                               Section == "8000595") %>%
-                     summarise(count = n())
+    summarise(count = n())
 
   final[i,"n_patient_im_out"] = patients %>%
-    filter(arrival_date_time < j & leave_date_time > j & 
+    filter(arrival_date_time <= j & leave_date_time > j & 
              Surgery_Type == "Internal_Medicine" &
              Section == "other") %>%
     summarise(count = n())
   
   final[i,"n_patient_other_in"] = patients %>%
-    filter(arrival_date_time < j & leave_date_time > j & 
+    filter(arrival_date_time <= j & leave_date_time > j & 
              Surgery_Type == "Others" &
              Section == "8000595") %>%
     summarise(count = n())
   
   
   final[i,"n_patient_other_out"] = patients %>%
-    filter(arrival_date_time < j & leave_date_time > j & 
+    filter(arrival_date_time <= j & leave_date_time > j & 
              Surgery_Type == "Others" &
              Section == "other") %>%
     summarise(count = n())
@@ -124,17 +99,67 @@ for (i in seq_along(final$date_time)){
   print(i)
 }
 
+#check
 plot(final$n_patient_im_in+final$n_patient_other_in, type="l")
 abline(h = 19, col=2)
 
-check = final %>% filter(hour(final$date_time)==23)
+check = final %>% filter(hour(final$date_time)==00)
 check$date = ymd(floor_date(check$date_time, unit = c("day")))
 check$recovery = check$n_patient_im_in+check$n_patient_other_in
 check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
 
 sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
-
-sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
+#sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
 
 plot(check$recovery, type="l", lwd = 2, lambda=0.9)
 lines(historical_info$patients,col="blue")
+
+
+######################################
+#calcolo score
+######################################
+
+score = data.frame(
+  bed = numeric(),
+  saturation = numeric(),
+  unoccuppied = numeric(),
+  productivity=numeric(),
+  security = numeric(),
+  accessibility = numeric())
+
+i=1
+for (b in 1:30){
+  for (u in 1:10){
+    for (s in 1:2){
+      score[i, "saturation"] = s
+      score[i, "unoccuppied"] = u
+      score[i, "bed"] = b
+      
+      score$productivity[i] = sum(final$n_patient_im_in + final$n_patient_other_in < b-u)
+      score$security[i] = sum(final$n_patient_im_out)
+      score$accessibility[i] = sum(b - final$n_patient_im_in + final$n_patient_other_in < s)
+      i = i+1
+    }
+  }
+}
+
+
+score2 =  score %>% group_by (saturation, unoccuppied, bed) %>%
+  summarise(productivity = sum(productivity),
+            security = sum(security),
+            accessibility = sum(accessibility))
+
+score3 = melt(score2, id.vars = c("bed"))
+
+
+score4 =  score3 %>% group_by (bed) %>%
+  summarise(score_avg = mean(value),
+            score_sd = sd(value))
+
+
+
+plot(score4$bed, score4$score_sd, type = "b",col="blue",
+      ylim = c(400, 1000))
+lines(score4$bed, score4$score_avg, type = "b")
+
+
