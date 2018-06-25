@@ -1,0 +1,20 @@
+Scenario 
+productivity (numero di giorni con meno di tot letti vuoti) >
+accessibility(numero di giorni senza  almeno 1,2 letto per emergenze) > 
+security (numero di giorni con meno di x trasferimenti) > 
+Simuliamo una serie 
+Obiettivo
+[(100 euro * 10 pazienti) – (1 paziente*10 euro)]+ [(100 euro * 10 pazienti) – (1 paziente*10 euro)]
+
+Min(numero_out)
+
+Output numero letti ottimale
+
+Obiettivo 
+Max(somma dei letti occupati al giorno Li in 1 anno - somma de minuti attesa Ai)
+((L1 + L2 +L3 +Li) – conta(se Ai>60))
+Vincoli
+10<Li<18 
+Ai < 60 minuti
+Distribuzione(Ai) exponential (media)
+Trasferimenti ?
