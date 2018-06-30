@@ -4,9 +4,10 @@
 
 
 
-library("lubridate", lib.loc="C:/Program Files/R/R-3.3.1/library")
-library("dplyr", lib.loc="C:/Program Files/R/R-3.3.1/library")
-library("reshape2", lib.loc="C:/Program Files/R/R-3.3.1/library")
+library("lubridate")
+library("dplyr")
+library("reshape2")
+library("ggplot2")
 
 historical_info <- read.csv("C:/Users/Giacomo Monti/Desktop/decision model/final projects/historical_info.csv", sep=";", stringsAsFactors=FALSE)
 patients <- read.delim2("C:/Users/Giacomo Monti/Desktop/decision model/final projects/patients.csv", stringsAsFactors=FALSE)
@@ -46,21 +47,24 @@ patients$rexp_round = floor(patients$rexp)
 patients$rexp_decimal = patients$rexp-patients$rexp_round
 patients$los_estimate = (patients$Length_of_Stay_day*24*60)+
   round(patients$rexp_decimal*24*60,0)
+patients$rexp = NULL
+patients$rexp_round = NULL
+patients$rexp_decimal = NULL
 
 
-
-patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in surgery
+patients$leave_date_time = 
+  patients$arrival_date_time+ #ora ingresso in surgery
   minutes(
-    # patients$Surgery_Time_min+
-    # patients$POST_ANESTHESIA_CARE_UNIT_Time_min+
-    patients$los_estimate)
-#stima los in minuti
+    round(patients$Surgery_Time_min,0) +
+      round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0) +
+      patients$los_estimate)
 
-View(head(patients[,c("arrival_date_time","leave_date_time",
-                        "Length_of_Stay_day",
-                        "rexp", "rexp_round", 
-                        "rexp_decimal",
-                        "los_estimate" )],100))
+
+#View(head(patients[,c("arrival_date_time","leave_date_time",
+#                      "Length_of_Stay_day",
+#                      "Surgery_Time_min",
+#                      "POST_ANESTHESIA_CARE_UNIT_Time_min",
+#                      "los_estimate" )],10))
 
 patients = patients[order(patients$leave_date_time),] 
 patients$leave_date_time_t0 = lag(patients$leave_date_time)
@@ -209,40 +213,35 @@ hist(patients$Length_of_Stay_day)
 ############      stima pazienti oraria           ############
 ##############################################################
 
-hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-03-15 23:00:00'), by = 'hour')  
+hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-10-30 23:00:00'), by = '30 min')  
 final = data.frame(date_time = hour_series)
 
 #write.table(patients, "C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\patients_modified.csv", 
 #            sep = ";", quote = FALSE, row.names = F)
 
+timestamp()
 for (i in seq_along(final$date_time)){
   j = final$date_time[i]
   
-  final[i,"n_patient_im_in"] = patients %>%
-    filter(arrival_date_time <= j & leave_date_time > j &
-             Surgery_Type == "Internal_Medicine" &
-             Section == "8000595") %>%
-    summarise(count = n())
+  final[i,"n_patient_im_in"] = 
+    length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
+                      patients$Surgery_Type == "Internal_Medicine" &
+                      patients$Section == "8000595","Patient_ID"])
+
+  final[i,"n_patient_im_out"] = 
+    length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
+                      patients$Surgery_Type == "Internal_Medicine" &
+                      patients$Section == "other","Patient_ID"])
+
+  final[i,"n_patient_other_in"] = 
+    length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
+                      patients$Surgery_Type == "Others" &
+                      patients$Section == "8000595","Patient_ID"])
   
-  final[i,"n_patient_im_out"] = patients %>%
-    filter(arrival_date_time <= j & leave_date_time > j & 
-             Surgery_Type == "Internal_Medicine" &
-             Section == "other") %>%
-    summarise(count = n())
-  
-  final[i,"n_patient_other_in"] = patients %>%
-    filter(arrival_date_time <= j & leave_date_time > j & 
-             Surgery_Type == "Others" &
-             Section == "8000595") %>%
-    summarise(count = n())
-  
-  
-  final[i,"n_patient_other_out"] = patients %>%
-    filter(arrival_date_time <= j & leave_date_time > j & 
-             Surgery_Type == "Others" &
-             Section == "other") %>%
-    summarise(count = n())
-  
+  final[i,"n_patient_other_out"] = 
+    length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
+                      patients$Surgery_Type == "Others" &
+                      patients$Section == "other","Patient_ID"])
   print(i)
 }
 
@@ -252,7 +251,8 @@ abline(h = 19, col=2)
 
 check = final %>% filter(hour(final$date_time)==00)
 check$date = ymd(floor_date(check$date_time, unit = c("day")))
-check$recovery = check$n_patient_im_in + check$n_patient_other_in
+check$recovery = check$n_patient_im_in 
+#+ check$n_patient_other_in
 #+check$n_patient_other_in
 check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
 
@@ -261,8 +261,13 @@ sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
 #sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
 
 #plot(historical_info$patients, type="l")
-plot(check$recovery, type="l", lwd = 2, lambda=0.9)
+plot(check$recovery, type="l", lwd = 1, lambda=0.9)
+abline(h = 19, col=2)
+abline(h = mean(check$recovery))
 lines(historical_info$patients,col="blue",type="l")
+abline(h = mean(historical_info$patients) ,col="blue")
+legend(0, 27, legend=c("Estimate", "Historical"),
+       col=c("black", "blue"), lty=1, cex=0.6, bty="n")
 
 final$tot_recovery = final$n_patient_im_in + final$n_patient_other_in
 final$tot_patient = final$n_patient_im_in + final$n_patient_other_in+
