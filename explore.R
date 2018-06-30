@@ -41,18 +41,26 @@ patients$minutes_to_next = difftime(patients$arrival_date_time,patients$arrival_
 
 
 set.seed(1234)
-patients$los_random = rexp( dim(patients)[1] , 1/mean(patients$Length_of_Stay_day))
+patients$rexp = rexp( dim(patients)[1] , 1/mean(patients$Length_of_Stay_day))
+patients$rexp_round = floor(patients$rexp)
+patients$rexp_decimal = patients$rexp-patients$rexp_round
+patients$los_estimate = (patients$Length_of_Stay_day*24*60)+
+  round(patients$rexp_decimal*24*60,0)
+
+
 
 patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in surgery
-#   patients$Surgery_Time_min+
-#  patients$POST_ANESTHESIA_CARE_UNIT_Time_min+
   minutes(
-    round(
-      (patients$los_random[1]-floor(patients$los_random)[1])*24*60
-    ,0)
-    )#stima los in minuti
+    # patients$Surgery_Time_min+
+    # patients$POST_ANESTHESIA_CARE_UNIT_Time_min+
+    patients$los_estimate)
+#stima los in minuti
 
-
+View(head(patients[,c("arrival_date_time","leave_date_time",
+                        "Length_of_Stay_day",
+                        "rexp", "rexp_round", 
+                        "rexp_decimal",
+                        "los_estimate" )],100))
 
 patients = patients[order(patients$leave_date_time),] 
 patients$leave_date_time_t0 = lag(patients$leave_date_time)
@@ -157,13 +165,9 @@ barplot(prop.table(table(patients$arrival_dom)))
 
 ################### p di los dato ingresso in recovery ###################
 temp = unclass(prop.table(table(hour(patients$arrival_time),
-                           patients$POST_ANESTHESIA_CARE_UNIT_Time_min
-                           ), margin = 1)*100)
+                                patients$POST_ANESTHESIA_CARE_UNIT_Time_min
+), margin = 1)*100)
 
-0 5
-6 11
-12 17
-18 23
 
 
 patients$arrival_hour_range = cut(patients$arrival_hour, b = c(-1,5,11,17,24))
@@ -205,7 +209,7 @@ hist(patients$Length_of_Stay_day)
 ############      stima pazienti oraria           ############
 ##############################################################
 
-hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-10-31 23:00:00'), by = 'hour')  
+hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-03-15 23:00:00'), by = 'hour')  
 final = data.frame(date_time = hour_series)
 
 #write.table(patients, "C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\patients_modified.csv", 
@@ -248,7 +252,7 @@ abline(h = 19, col=2)
 
 check = final %>% filter(hour(final$date_time)==00)
 check$date = ymd(floor_date(check$date_time, unit = c("day")))
-check$recovery = check$n_patient_im_in
+check$recovery = check$n_patient_im_in + check$n_patient_other_in
 #+check$n_patient_other_in
 check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
 
@@ -256,9 +260,9 @@ check_2= merge(check,  historical_info, by.x = "date", by.y = "Date")
 sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
 #sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
 
-
+#plot(historical_info$patients, type="l")
 plot(check$recovery, type="l", lwd = 2, lambda=0.9)
-lines(historical_info$patients,col="blue")
+lines(historical_info$patients,col="blue",type="l")
 
 final$tot_recovery = final$n_patient_im_in + final$n_patient_other_in
 final$tot_patient = final$n_patient_im_in + final$n_patient_other_in+
@@ -320,7 +324,7 @@ for (u in 1:10){
          main = paste ("unoccuppied=",u,"& saturation=",s),
          ylim = c( min(min(score4$score_avg),min(score4$score_sd)), 
                    max(max(score4$score_avg),max(score4$score_sd))
-                   ))
+         ))
     lines(scenario$bed, scenario$score_sd, type = "b",col="blue")
   }}
 
