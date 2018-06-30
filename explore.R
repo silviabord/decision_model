@@ -25,6 +25,10 @@ historical_info$Date = dmy(historical_info$Date)
 patients$arrival_date = dmy(patients$Arrival_Date)
 patients$arrival_date_time = dmy_hms(paste(patients$Arrival_Date, patients$Arrival.Time))
 patients$arrival_time = dmy_hms(paste("01 01 1991", patients$Arrival.Time))
+patients$arrival_month = month(patients$arrival_date)
+patients$arrival_dom = mday(patients$arrival_date)
+patients$arrival_hour = as.numeric(hour(patients$arrival_time))
+
 patients$waiting_time_round = round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
 patients$Arrival.Time=NULL
 #patients$bed_date = patients$arrival_date
@@ -37,10 +41,18 @@ patients$minutes_to_next = difftime(patients$arrival_date_time,patients$arrival_
 
 
 set.seed(1234)
-patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in recovery
-  minutes(round((
-    #patients$Length_of_Stay_day*24+
-                   rexp(1, 1/mean(patients$Length_of_Stay_day))*24)*60,0)) #stima los in minuti
+patients$los_random = rexp( dim(patients)[1] , 1/mean(patients$Length_of_Stay_day))
+
+patients$leave_date_time = patients$arrival_date_time+ #ora ingresso in surgery
+#   patients$Surgery_Time_min+
+#  patients$POST_ANESTHESIA_CARE_UNIT_Time_min+
+  minutes(
+    round(
+      (patients$los_random[1]-floor(patients$los_random)[1])*24*60
+    ,0)
+    )#stima los in minuti
+
+
 
 patients = patients[order(patients$leave_date_time),] 
 patients$leave_date_time_t0 = lag(patients$leave_date_time)
@@ -87,7 +99,10 @@ legend(662688000, 3500, legend=c("Leave", "Arrival"),
 
 #distance between arrival
 hist(as.numeric(patients$minutes_to_next), breaks = 50)
-hist(as.numeric(patients$hours_to_next), breaks=20)
+hist(as.numeric(patients$hours_to_next), breaks=50)
+
+table(month(patients$arrival_date), as.numeric(patients$hours_to_next))
+
 median(as.numeric(patients$minutes_to_next), na.rm = T)
 mean(as.numeric(patients$minutes_to_next), na.rm = T)
 
@@ -112,7 +127,7 @@ mean(as.numeric(patients$minutes_to_next_leave), na.rm = T)
 #serie storica ingressi nel reparto 
 plot(historical_info$patients, type = "l")
 ###################secondo historical_info a mezzanotte ci sono in media 10 letti occupati###################
-hist(historical_info$patients)
+barplot(prop.table(table((historical_info$patients))))
 summary(historical_info$patients)
 
 ###################historical_info has 1 month more###################
@@ -127,14 +142,41 @@ table(patients$Section, patients$Surgery_Type)
 ###################pazienti arrivano a qualunque ora equiprobabilmente###################
 barplot(prop.table(table(hour(patients$arrival_time))),main = "arrival_time")
 
+
 ###################pazienti arrivano a qualunque ora equiprobabilmente###################
 patients$dow = factor(weekdays(patients$arrival_date), ordered=T,
                       levels=c("lunedì","martedì","mercoledì","giovedì","venerdì","sabato","domenica")) 
 barplot(prop.table(table(patients$dow)),main = "dow")
 
+
+
+################### arrivano gli stesi tutti i mesi ###################
+barplot(prop.table(table(patients$arrival_month)))
+barplot(prop.table(table(patients$arrival_dom)))
+
+
+################### p di los dato ingresso in recovery ###################
+temp = unclass(prop.table(table(hour(patients$arrival_time),
+                           patients$POST_ANESTHESIA_CARE_UNIT_Time_min
+                           ), margin = 1)*100)
+
+0 5
+6 11
+12 17
+18 23
+
+
+patients$arrival_hour_range = cut(patients$arrival_hour, b = c(-1,5,11,17,24))
+
+ggplot(patients, aes(POST_ANESTHESIA_CARE_UNIT_Time_min,
+                     colour = as.factor(arrival_hour_range))) +
+  geom_density()
+
 ###################durata surgery esponenziale neg ###################
 barplot(prop.table(table(round(patients$Surgery_Time_min,0))),
         main = "Surgery_Time_min")
+
+
 
 ###################attesa ingresso esponenziale neg ###################
 barplot(prop.table(table(round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0))),
@@ -153,9 +195,15 @@ mean(patients$Length_of_Stay_day)
 rexp(20, rate = 1/mean(patients$Length_of_Stay_day))*24
 hist(rexp(2000, rate = 1/mean(patients$Length_of_Stay_day)), breaks=20)
 hist(patients$Length_of_Stay_day)
-######################################
-#Conteggio stima pazienti oraria
-######################################
+
+
+
+
+
+
+##############################################################
+############      stima pazienti oraria           ############
+##############################################################
 
 hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-10-31 23:00:00'), by = 'hour')  
 final = data.frame(date_time = hour_series)
@@ -194,17 +242,20 @@ for (i in seq_along(final$date_time)){
   print(i)
 }
 
-#check
+###################   controllo se i dati tornano con historical   ###################
 plot(final$n_patient_im_in+final$n_patient_other_in, type="l")
 abline(h = 19, col=2)
 
 check = final %>% filter(hour(final$date_time)==00)
 check$date = ymd(floor_date(check$date_time, unit = c("day")))
-check$recovery = check$n_patient_im_in+check$n_patient_other_in
+check$recovery = check$n_patient_im_in
+#+check$n_patient_other_in
 check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
 
+#errore stima con historical
 sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
 #sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
+
 
 plot(check$recovery, type="l", lwd = 2, lambda=0.9)
 lines(historical_info$patients,col="blue")
@@ -229,14 +280,14 @@ score = data.frame(
   accessibility = numeric())
 
 i=1
-for (b in 5:35){
+for (b in 10:35){
   for (u in 1:10){
     for (s in 1:2){
       score[i, "saturation"] = s
       score[i, "unoccuppied"] = u
       score[i, "bed"] = b
       
-      #score$productivity[i] = sum(b - final$n_patient_im_in + final$n_patient_other_in > u)
+      score$productivity[i] = sum(b - final$n_patient_im_in + final$n_patient_other_in > u)
       score$productivity[i] = sum(b - final$n_patient_im_in > u)
       
       #es. u=5 max 5 bed empty >> 19-18=1 >> 1>5 FALSE
@@ -267,7 +318,9 @@ for (u in 1:10){
     scenario = score4 %>% filter (saturation==s, unoccuppied==u)
     plot(scenario$bed, scenario$score_avg, type = "b",
          main = paste ("unoccuppied=",u,"& saturation=",s),
-         ylim = c(4500,6000))
+         ylim = c( min(min(score4$score_avg),min(score4$score_sd)), 
+                   max(max(score4$score_avg),max(score4$score_sd))
+                   ))
     lines(scenario$bed, scenario$score_sd, type = "b",col="blue")
   }}
 
