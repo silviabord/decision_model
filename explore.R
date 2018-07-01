@@ -2,8 +2,6 @@
 #########       decision model       ########
 #############################################
 
-
-
 library("lubridate")
 library("dplyr")
 library("reshape2")
@@ -42,7 +40,9 @@ patients$minutes_to_next = difftime(patients$arrival_date_time,patients$arrival_
 
 
 set.seed(1234)
-patients$rexp = rexp( dim(patients)[1] , 1/mean(patients$Length_of_Stay_day))
+#decidere parametro exp negativa >> 1/media
+#mean(patients$Length_of_Stay_day)
+patients$rexp = rexp( dim(patients)[1] , 1/0.5)
 patients$rexp_round = floor(patients$rexp)
 patients$rexp_decimal = patients$rexp-patients$rexp_round
 patients$los_estimate = (patients$Length_of_Stay_day*24*60)+
@@ -53,11 +53,33 @@ patients$rexp_decimal = NULL
 
 
 patients$leave_date_time = 
-  patients$arrival_date_time+ #ora ingresso in surgery
+  ymd_hms(patients$arrival_date_time+ #ora ingresso in surgery
   minutes(
     round(patients$Surgery_Time_min,0) +
       round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0) +
-      patients$los_estimate)
+      patients$los_estimate))
+
+
+
+#modifico leave date di modo che se uno dovrebbe uscire dopo le 18 lo postpongo alle 8 del giorno dopo
+patients$adjust_1 = ymd_hms(paste("1991-10-01 ", 
+                         hour(patients$leave_date_time), ":",
+                         minute(patients$leave_date_time),":00", sep=""))
+patients$adjust_late_afternoon = difftime(ymd_hms(paste("1991-10-02 ", "08:00:00", sep="")),
+  patients$adjust_1, units = "mins")
+  
+patients$adjust_early_morning = difftime(ymd_hms(paste("1991-10-01 ", "08:00:00", sep="")),
+  patients$adjust_1, units="mins")
+
+patients$leave_date_time_old = patients$leave_date_time
+
+filter = hour(patients$leave_date_time) %in% c(18:23)
+patients[filter,"leave_date_time"] = patients[filter,"leave_date_time"]+
+  minutes(patients[filter,"adjust_late_afternoon"])
+
+filter = hour(patients$leave_date_time) %in% c(00:06)
+patients[filter,"leave_date_time"] = patients[filter,"leave_date_time"]+
+  minutes(patients[filter,"adjust_early_morning"])
 
 
 #View(head(patients[,c("arrival_date_time","leave_date_time",
@@ -95,7 +117,7 @@ temp = patients %>% group_by(arrival_time) %>%
 #plot con minutes_to next_leave
 plot(temp$arrival_time, temp$avg_minutes_to_next_leave, type="b", pch=19,
      lwd = 1, lambda=0.9, main = "Minutes to next leave vs minutes to next arrival",
-     ylim=c(95,140), xlab = "Hour", ylab = "Minutes to next a/l")
+     ylim=c(60,200), xlab = "Hour", ylab = "Minutes to next a/l")
 lines (temp$arrival_time, temp$avg_minutes_to_next_arrival, type="b",  pch=19,
        lwd = 1, col= "blue")
 legend(662688000, 110, legend=c("Leave", "Arrival"),
@@ -112,6 +134,8 @@ legend(662688000, 3500, legend=c("Leave", "Arrival"),
 #distance between arrival
 hist(as.numeric(patients$minutes_to_next), breaks = 50)
 hist(as.numeric(patients$hours_to_next), breaks=50)
+
+#as.numeric(mean(patients$hours_to_next, na.rm=T))
 
 table(month(patients$arrival_date), as.numeric(patients$hours_to_next))
 
@@ -154,6 +178,7 @@ table(patients$Section, patients$Surgery_Type)
 ###################pazienti arrivano a qualunque ora equiprobabilmente###################
 barplot(prop.table(table(hour(patients$arrival_time))),main = "arrival_time")
 
+barplot(prop.table(table(hour(patients$leave_date_time))),main = "leave_time")
 
 ###################pazienti arrivano a qualunque ora equiprobabilmente###################
 patients$dow = factor(weekdays(patients$arrival_date), ordered=T,
@@ -199,10 +224,6 @@ barplot(prop.table(table(round(patients$Length_of_Stay_day,0))),
         main = "Length_of_Stay_day")
 mean(patients$Length_of_Stay_day)
 
-#simulate POST_ANESTHESIA_CARE_UNIT_Time_min
-rexp(20, rate = 1/mean(patients$Length_of_Stay_day))*24
-hist(rexp(2000, rate = 1/mean(patients$Length_of_Stay_day)), breaks=20)
-hist(patients$Length_of_Stay_day)
 
 
 
@@ -227,12 +248,12 @@ for (i in seq_along(final$date_time)){
     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
                       patients$Surgery_Type == "Internal_Medicine" &
                       patients$Section == "8000595","Patient_ID"])
-
+  
   final[i,"n_patient_im_out"] = 
     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
                       patients$Surgery_Type == "Internal_Medicine" &
                       patients$Section == "other","Patient_ID"])
-
+  
   final[i,"n_patient_other_in"] = 
     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
                       patients$Surgery_Type == "Others" &
@@ -251,10 +272,10 @@ abline(h = 19, col=2)
 
 check = final %>% filter(hour(final$date_time)==00)
 check$date = ymd(floor_date(check$date_time, unit = c("day")))
-check$recovery = check$n_patient_im_in 
+check$recovery = check$n_patient_im_in
 #+ check$n_patient_other_in
 #+check$n_patient_other_in
-check_2= merge(check,  historical_info, by.x = "date", by.y = "Date") 
+check_2= merge(check,  historical_info, by.x = "date", by.y = "Date")
 
 #errore stima con historical
 sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
@@ -268,25 +289,28 @@ lines(historical_info$patients,col="blue",type="l")
 abline(h = mean(historical_info$patients) ,col="blue")
 legend(0, 27, legend=c("Estimate", "Historical"),
        col=c("black", "blue"), lty=1, cex=0.6, bty="n")
-
-final$tot_recovery = final$n_patient_im_in + final$n_patient_other_in
-final$tot_patient = final$n_patient_im_in + final$n_patient_other_in+
-  final$n_patient_im_out + final$n_patient_other_out
-
-hist(final$tot_patient)
+# 
+# final$tot_recovery = final$n_patient_im_in + final$n_patient_other_in
+# final$tot_patient = final$n_patient_im_in + final$n_patient_other_in+
+# final$n_patient_im_out + final$n_patient_other_out
+# 
+# hist(final$tot_patient)
 
 ######################################
 #Conteggio stima pazienti oraria
 ######################################
 #quanti letti ha bisogno medicina interna
 
+#score APS
 score = data.frame(
-  bed = numeric(),
-  saturation = numeric(),
-  unoccuppied = numeric(),
-  productivity=numeric(),
-  security = numeric(),
-  accessibility = numeric())
+  bed = numeric(),         #parameter for bed
+  saturation = numeric(),  #treshold for accessibility
+  unoccuppied = numeric(), #treshold for productivity
+  
+  accessibility = numeric(),
+  productivity=numeric(),  
+  security = numeric()
+)
 
 i=1
 for (b in 10:35){
@@ -302,7 +326,7 @@ for (b in 10:35){
       #es. u=5 max 5 bed empty >> 19-18=1 >> 1>5 FALSE
       #es. u=5 max 5 bed empty >> 19-10=9 >> 9>5 TRUE
       
-      score$security[i] = sum(final$n_patient_im_out)
+      score$security[i] = sum(final$n_patient_im_out != 0)
       score$accessibility[i] = sum(b - final$n_patient_im_in < s)
       #es. s=1 at least 1 bed available >> 19-18=1 >> 1<1 FALSE
       #es. s=1 at least 1 bed available >> 19-19=1 >> 0<1 TRUE
@@ -337,5 +361,30 @@ for (u in 1:10){
 #minimo standard deviation perchè
 
 
+######################################
+#Simulazione
+######################################
+
+hist(patients$minutes_to_next)
+lambda_arrivi = 1/as.numeric(mean(patients$minutes_to_next, na.rm=T))
+hist(rexp(200,lambda_arrivi))
+
+hist(patients$Surgery_Time_min)
+lambda_surgery = 1/as.numeric(mean(patients$Surgery_Time_min, na.rm=T))
+hist(rexp(200,lambda_arrivi))
+
+hist(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
+lambda_waiting = 1/as.numeric(mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min, na.rm=T))
+hist(rexp(200,lambda_waiting))
+
+hist(patients$los_estimate)
+lambda_los = 1/as.numeric(mean(patients$los_estimate, na.rm=T))
+hist(rexp(200,lambda_los))
+
+
+Arrival_hour
+Surgery_minutes
+Waiting_minutes
+los_minutes
 
 
