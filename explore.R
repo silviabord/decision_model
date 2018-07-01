@@ -54,22 +54,22 @@ patients$rexp_decimal = NULL
 
 patients$leave_date_time = 
   ymd_hms(patients$arrival_date_time+ #ora ingresso in surgery
-  minutes(
-    round(patients$Surgery_Time_min,0) +
-      round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0) +
-      patients$los_estimate))
+            minutes(
+              round(patients$Surgery_Time_min,0) +
+                round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0) +
+                patients$los_estimate))
 
 
 
 #modifico leave date di modo che se uno dovrebbe uscire dopo le 18 lo postpongo alle 8 del giorno dopo
 patients$adjust_1 = ymd_hms(paste("1991-10-01 ", 
-                         hour(patients$leave_date_time), ":",
-                         minute(patients$leave_date_time),":00", sep=""))
+                                  hour(patients$leave_date_time), ":",
+                                  minute(patients$leave_date_time),":00", sep=""))
 patients$adjust_late_afternoon = difftime(ymd_hms(paste("1991-10-02 ", "08:00:00", sep="")),
-  patients$adjust_1, units = "mins")
-  
+                                          patients$adjust_1, units = "mins")
+
 patients$adjust_early_morning = difftime(ymd_hms(paste("1991-10-01 ", "08:00:00", sep="")),
-  patients$adjust_1, units="mins")
+                                         patients$adjust_1, units="mins")
 
 patients$leave_date_time_old = patients$leave_date_time
 
@@ -296,12 +296,183 @@ legend(0, 27, legend=c("Estimate", "Historical"),
 # 
 # hist(final$tot_patient)
 
+
+#################################
+####       Simulazione       ####
+#################################
+
+hist(patients$minutes_to_next)
+lambda_interarrivi = 1/as.numeric(mean(patients$minutes_to_next, na.rm=T))
+hist(rexp(200,lambda_interarrivi))
+#aumentare media arrivi
+
+hist(patients$Surgery_Time_min)
+lambda_surgery = 1/as.numeric(mean(patients$Surgery_Time_min, na.rm=T))
+hist(rexp(200,lambda_surgery))
+
+#hist(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
+#lambda_waiting = 1/as.numeric(mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min, na.rm=T))
+#hist(rexp(200,lambda_waiting))
+
+hist(patients$los_estimate)
+lambda_los = 1/as.numeric(mean(patients$los_estimate, na.rm=T))
+hist(rexp(200,lambda_los))
+
+####################
+###   function   ###
+####################
+simulate_arrival=function(start = "2018-01-01 00:05:00", n_month=1,
+                          lambda_interarrivi, lambda_surgery, lambda_los){
+  set.seed(12345)
+  
+  simulation=data.frame(
+    patient_id = integer(),
+    arrival_date_time = integer(),
+    surgery_time = numeric(),
+    start_waiting = integer(),
+    los = numeric()
+  )
+  
+  class(simulation$arrival_date_time) <- "POSIXct"
+  class(simulation$start_waiting) <- "POSIXct"
+  
+  #####
+  start = ymd_hms(start)
+  arrival = ymd_hms(start)
+  i=1
+  while (arrival < start+months(n_month)) {
+    
+    #stime 
+    rexp_interarrival = round(rexp(1,lambda_interarrivi),0)
+    rexp_surgery = round(rexp(1,lambda_surgery),0)
+    rexp_los = round(rexp(1,lambda_los),0)
+    
+    #simulate series
+    simulation[i,"patient_id"] = i
+    simulation[i,"arrival_date_time"] = arrival + minutes(rexp_interarrival)
+    simulation[i, "surgery_time"] = rexp_surgery
+    simulation[i, "start_waiting"] = arrival + minutes(rexp_interarrival + rexp_surgery)
+    simulation[i, "los"] = rexp_los
+    
+    arrival = arrival+minutes(rexp_interarrival)
+    #print(rexp_interarrival)
+    i=i+1
+  }
+  return(simulation) }
+
+simulation = simulate_arrival(start = "2018-02-01 00:05:00", n_month=1,
+                              lambda_interarrivi, lambda_surgery, lambda_los)
+
+####################
+###   function   ###
+####################
+queue_ordered = simulation[order(simulation$start_waiting),]
+simulation_full = simulation
+
+recovery = data.frame(
+  patient_id = integer(),
+  start_waiting = integer(),
+  admission = integer(),
+  leave = integer()
+)
+
+class(recovery$start_waiting) <- "POSIXct"
+class(recovery$admission) <- "POSIXct"
+class(recovery$leave) <- "POSIXct"
+
+
+n_letti = 19
+date = min(simulation$start_waiting)
+
+while (date < max(simulation$start_waiting)){
+  #     max(simulation$start_waiting)){
+  #       ymd_hms("2018-02-04 20:57:00")){
+  
+  
+  
+  
+  
+  #quanti letti si liberano dalla recovery
+  free_bed = n_letti - (dim(recovery)[1]-sum(recovery$leave < date))
+  
+  if (free_bed != 0) {
+    
+    #segno in simulation full dati uscita recovery
+    patient_out = recovery[recovery$leave < date,c("patient_id","admission","leave")]
+    simulation_full[simulation_full$patient_id %in% patient_out$patient_id,"admission"] = patient_out$admission
+    simulation_full[simulation_full$patient_id %in% patient_out$patient_id,"leave"] = patient_out$leave
+    #tolgo dalla recovery quelli usciti
+    recovery = recovery[!recovery$patient_id %in% patient_out$patient_id,]
+    
+    #prendo i primi della queue pronti (se ci sono) e li metto in recovery
+    ready = queue_ordered[queue_ordered$start_waiting<=date,]
+    
+    if (dim(ready)[1]!=0){
+      #print(free_bed)
+      free_bed = if( dim(ready)[1] < free_bed){dim(ready)[1]}else{free_bed} 
+      #print(free_bed)
+      
+      recovery= rbind(
+        recovery,
+        
+        data.frame(
+          patient_id = ready[seq(1 :  free_bed),"patient_id"],
+          start_waiting = ready[seq(1 :  free_bed),"start_waiting"],
+          admission = rep(date, free_bed),
+          leave = date + minutes(ready[seq(1 :  free_bed),"los"])
+        ))
+      
+      #rimuovo dalla coda quelli che possono entrare
+      
+      #print(dim(queue_ordered)[1])
+      queue_ordered = queue_ordered[- seq(1 :  free_bed),]
+      #print(c(free_bed, dim(queue_ordered)[1]))
+    }}
+  
+  #sistemata la recovery controllo se ce qualcuno che aspetta da troppo
+  ready2 = queue_ordered[queue_ordered$start_waiting<=date,]
+  attesa = difftime(date , ready2$start_waiting,  units = "mins")
+  
+  #print(any(attesa>60))
+  if(any(attesa>=60)){
+    
+    trasferimenti = ready2[attesa>60,]
+    
+    simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"admission"] = date
+    simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"leave"] =
+      date + minutes(trasferimenti$los)
+    simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"transfer"] = TRUE
+    
+    queue_ordered =  queue_ordered[!queue_ordered$patient_id %in% trasferimenti$patient_id,]
+  }
+  
+  date = date + minutes(30)
+  #  print(date)
+}#-----------------fine while
+
+class(simulation_full$leave) <- "POSIXct"
+class(simulation_full$admission) <- "POSIXct"
+
+simulation_full$waiting_time = difftime(simulation_full$admission , simulation_full$start_waiting,
+                                        units = "mins")
+
+
+
+
+
+
+
+
+
+
+
+
+
 ######################################
-#Conteggio stima pazienti oraria
+#     score e funzione  obiettivo   #
 ######################################
 #quanti letti ha bisogno medicina interna
 
-#score APS
 score = data.frame(
   bed = numeric(),         #parameter for bed
   saturation = numeric(),  #treshold for accessibility
@@ -359,32 +530,4 @@ for (u in 1:10){
 
 
 #minimo standard deviation perchè
-
-
-######################################
-#Simulazione
-######################################
-
-hist(patients$minutes_to_next)
-lambda_arrivi = 1/as.numeric(mean(patients$minutes_to_next, na.rm=T))
-hist(rexp(200,lambda_arrivi))
-
-hist(patients$Surgery_Time_min)
-lambda_surgery = 1/as.numeric(mean(patients$Surgery_Time_min, na.rm=T))
-hist(rexp(200,lambda_arrivi))
-
-hist(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
-lambda_waiting = 1/as.numeric(mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min, na.rm=T))
-hist(rexp(200,lambda_waiting))
-
-hist(patients$los_estimate)
-lambda_los = 1/as.numeric(mean(patients$los_estimate, na.rm=T))
-hist(rexp(200,lambda_los))
-
-
-Arrival_hour
-Surgery_minutes
-Waiting_minutes
-los_minutes
-
 
