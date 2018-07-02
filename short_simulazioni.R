@@ -8,67 +8,10 @@ library("dplyr")
 library("reshape2")
 library("ggplot2")
 
-historical_info <- read.csv("C:/Users/Giacomo Monti/Desktop/decision model/final projects/historical_info.csv", sep=";", stringsAsFactors=FALSE)
-patients <- read.delim2("C:/Users/Giacomo Monti/Desktop/decision model/final projects/patients.csv", stringsAsFactors=FALSE)
-
 #importa le funzioni per simulare
 source("C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\funzioni_decision_model.R")
 
-
-
-
-#############################################
-#########      data preparation      ########
-#############################################
-
-#format date time variables
-historical_info$Date = dmy(historical_info$Date)
-
-patients$arrival_date = dmy(patients$Arrival_Date)
-patients$arrival_date_time = dmy_hms(paste(patients$Arrival_Date, patients$Arrival.Time))
-patients$arrival_time = dmy_hms(paste("01 01 1991", patients$Arrival.Time))
-patients$arrival_month = month(patients$arrival_date)
-patients$arrival_dom = mday(patients$arrival_date)
-patients$arrival_hour = as.numeric(hour(patients$arrival_time))
-
-patients$waiting_time_round = round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
-patients$Arrival.Time=NULL
-
-patients = patients[order(patients$arrival_date_time),] 
-patients$arrival_date_time_t0 = lag(patients$arrival_date_time)
-patients$hours_to_next = difftime(patients$arrival_date_time,patients$arrival_date_time_t0, units = "hour")
-patients$minutes_to_next = difftime(patients$arrival_date_time,patients$arrival_date_time_t0, units = "min")
-
-
-set.seed(1234)
-#decidere parametro exp negativa >> 1/media
-#mean(patients$Length_of_Stay_day)
-patients$rexp = rexp( dim(patients)[1] , 1/0.5)
-patients$rexp_round = floor(patients$rexp)
-patients$rexp_decimal = patients$rexp-patients$rexp_round
-patients$los_estimate = (patients$Length_of_Stay_day*24*60)+
-  round(patients$rexp_decimal*24*60,0)
-patients$rexp = NULL
-patients$rexp_round = NULL
-patients$rexp_decimal = NULL
-
-
-patients$leave_date_time = 
-  ymd_hms(patients$arrival_date_time+ #ora ingresso in surgery
-            minutes(
-              round(patients$Surgery_Time_min,0) +
-                round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min,0) +
-                patients$los_estimate))
-
-
-
-patients = patients[order(patients$leave_date_time),] 
-patients$leave_date_time_t0 = lag(patients$leave_date_time)
-patients$hours_to_next_leave = difftime(patients$leave_date_time,patients$leave_date_time_t0, units = "hour")
-patients$minutes_to_next_leave = difftime(patients$leave_date_time,patients$leave_date_time_t0, units = "min")
-
-
-
+#lambda stimati da dati storici + los stimata in minuti
 lambda_interarrivi = 1/115.4885
 lambda_surgery = 1/74.01397
 lambda_los=1/1838.647
