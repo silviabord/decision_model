@@ -34,7 +34,7 @@ simulation = simulation [simulation$arrival_date_time > ymd_hms("2018-01-15 00:0
 #   funzione con parametri per recovery  #
 ##########################################
 
-simulation_full = simulate_recovery(data = simulation,  n_letti = 19, max_attesa = 60,  each=15)
+simulation_full = simulate_recovery(simulation = simulation,  n_letti = 19, max_attesa = 60,  each=15)
 
 #----------------data cleaning
 class(simulation_full$leave) <- "POSIXct"
