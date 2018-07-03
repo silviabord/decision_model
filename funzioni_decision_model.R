@@ -49,7 +49,7 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_month=1,
 ########################
 
 simulate_recovery = function(
-  data = simulation, 
+  simulation = simulation, 
   n_letti = 19,
   max_attesa = 60,  
   each=15#minuti
@@ -125,7 +125,7 @@ simulate_recovery = function(
     if(any(attesa>=max_attesa)){
       
       trasferimenti = ready2[attesa>=max_attesa,]
-      #sistemare se ci sono più di 1 paziente per match giusto
+      #sistemare se ci sono piÃ¹ di 1 paziente per match giusto
       simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"admission"] = date
       simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"leave"] =
         date + minutes(trasferimenti$los)
