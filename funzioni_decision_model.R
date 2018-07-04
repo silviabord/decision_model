@@ -2,10 +2,8 @@
 ##   simulate_arrival
 ########################
 
-simulate_arrival=function(start = "2018-01-01 00:05:00", n_month=1,
-                          lambda_interarrivi, lambda_surgery, lambda_los){
-  set.seed(12345)
-  
+simulate_arrival=function(start = "2018-01-01 00:05:00", n_days=45,
+                          lambda_interarrivi, lambda_surgery, lambda_los, seed){
   simulation=data.frame(
     patient_id = integer(),
     arrival_date_time = integer(),
@@ -21,11 +19,14 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_month=1,
   start = ymd_hms(start)
   arrival = ymd_hms(start)
   i=1
-  while (arrival < start+months(n_month)) {
+  while (arrival < start+days(n_days)) {
     
     #stime 
+    set.seed(seed)
     rexp_interarrival = round(rexp(1,lambda_interarrivi),0)
+    set.seed(seed)
     rexp_surgery = max(50, round(rexp(1,lambda_surgery),0))
+    set.seed(seed)
     rexp_los = round(rexp(1,lambda_los),0)
     
     #simulate series
@@ -49,7 +50,7 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_month=1,
 ########################
 
 simulate_recovery = function(
-  simulation = simulation, 
+  data = simulation, 
   n_letti = 19,
   max_attesa = 60,  
   each=15#minuti
@@ -58,6 +59,7 @@ simulate_recovery = function(
   #ordino la coda
   queue_ordered = simulation[order(simulation$start_waiting),]
   simulation_full = simulation
+  simulation_full$transfer = FALSE
   
   #inizializzo df
   recovery = data.frame(
