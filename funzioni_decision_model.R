@@ -19,14 +19,13 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_days=45,
   start = ymd_hms(start)
   arrival = ymd_hms(start)
   i=1
+  set.seed(seed)
   while (arrival < start+days(n_days)) {
     
     #stime 
-    set.seed(seed)
+   
     rexp_interarrival = round(rexp(1,lambda_interarrivi),0)
-    set.seed(seed)
     rexp_surgery = max(50, round(rexp(1,lambda_surgery),0))
-    set.seed(seed)
     rexp_los = round(rexp(1,lambda_los),0)
     
     #simulate series
@@ -50,15 +49,15 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_days=45,
 ########################
 
 simulate_recovery = function(
-  data = simulation, 
-  n_letti = 19,
-  max_attesa = 60,  
-  each=15#minuti
+  data, 
+  n_letti,
+  max_attesa ,  
+  each #minuti
 ){
   
   #ordino la coda
-  queue_ordered = simulation[order(simulation$start_waiting),]
-  simulation_full = simulation
+  queue_ordered = data[order(data$start_waiting),]
+  simulation_full = data
   simulation_full$transfer = FALSE
   
   #inizializzo df
@@ -74,9 +73,9 @@ simulate_recovery = function(
   class(recovery$leave) <- "POSIXct"
   
   #inizio ciclo da quando inizia a essere pronto ad entrare in recovery
-  date = min(simulation$start_waiting)
+  date = min(data$start_waiting)
   
-  while (date < max(simulation$start_waiting)+days(7)){
+  while (date < max(data$start_waiting)+days(7)){
     
     #quanti letti si liberano dalla recovery se non si libera nessuno passo ad ora dopo
     free_bed = n_letti - (dim(recovery)[1]-sum(recovery$leave < date))
@@ -125,7 +124,7 @@ simulate_recovery = function(
     
     #-------------  
     if(any(attesa>=max_attesa)){
-      
+      #print(attesa)
       trasferimenti = ready2[attesa>=max_attesa,]
       #sistemare se ci sono più di 1 paziente per match giusto
       simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"admission"] = date
