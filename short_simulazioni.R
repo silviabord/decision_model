@@ -1,8 +1,3 @@
-
-#############################################
-#########       decision model       ########
-#############################################
-
 library("lubridate")
 library("dplyr")
 library("reshape2")
@@ -17,23 +12,23 @@ source("C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\funzi
 
 sink("simulation_output.txt")
 
-# for seed_n in c(12345, 1, 1991, 300, 38746, 94345){
-#   for interarrivi in c(115.4885, 133, 98) {
-#     for letti in c(seq(17,27)){
-#       for attesa in c(50, 60, 65, 70, 90){
+for (seed_n in c(12345, 1, 1991, 300, 38746, 94345)){
+  for (interarrivi in c(115.4885, 133, 98)) {
+    for (letti in c(seq(17,27))){
+      for (attesa in c(50, 60, 65, 70, 90)){
 
 
-for (seed_n in c(12345)){
-  for (interarrivi in c(115.4885)) {
-    for (letti in c(17,27)){
-      for (attesa in c(50, 90)){        
-        
+# for (seed_n in c(12345)){
+#   for (interarrivi in c(115)) {
+#     for (letti in c(17,27)){
+#       for (attesa in c(50, 90)){        
+#         
         
         #------------simulation
-        simulation = simulate_arrival(start = "2018-01-01 00:05:00", n_days=45,
+        simulation = simulate_arrival(start = "2018-01-15 00:05:00", n_days=45,
                                       lambda_interarrivi=1/interarrivi  , 
-                                      lambda_surgery = 1/74.01397 ,
-                                      lambda_los = 1/1838.647,
+                                      lambda_surgery = 1/74 ,
+                                      lambda_los = 1/1838,
                                       seed = seed_n )
         
         
@@ -95,7 +90,7 @@ for (seed_n in c(12345)){
           round(d,0),
           round(e,0),
           round(f,0),
-          round(dim(final),0),
+          round(dim(final)[1],0),
           round(sum(a+c+d+e+f),0))
         ) 
         
@@ -104,6 +99,5 @@ for (seed_n in c(12345)){
   }
 }
 sink()
-
 
 
