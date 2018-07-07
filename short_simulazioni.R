@@ -2,6 +2,9 @@ library("lubridate")
 library("dplyr")
 library("reshape2")
 library("ggplot2")
+library("doParallel")
+library("foreach")
+
 source("C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\funzioni_decision_model.R")
 
 
@@ -12,10 +15,10 @@ source("C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\funzi
 
 sink("simulation_output.txt")
 
-for (seed_n in c(12345, 1, 1991, 300, 38746, 94345)){
-  for (interarrivi in c(115.4885, 133, 98)) {
-    for (letti in c(seq(17,27))){
-      for (attesa in c(50, 60, 65, 70, 90)){
+for (seed_n in c(12345)){
+  for (interarrivi in c(115)) {
+    for (letti in c(seq(17,30))){
+      for (attesa in c(60)){
 
 
 # for (seed_n in c(12345)){
@@ -25,7 +28,7 @@ for (seed_n in c(12345, 1, 1991, 300, 38746, 94345)){
 #         
         
         #------------simulation
-        simulation = simulate_arrival(start = "2018-01-15 00:05:00", n_days=45,
+        simulation = simulate_arrival(start = "2018-01-12 00:05:00", n_days=48,
                                       lambda_interarrivi=1/interarrivi  , 
                                       lambda_surgery = 1/74 ,
                                       lambda_los = 1/1838,
@@ -65,13 +68,24 @@ for (seed_n in c(12345, 1, 1991, 300, 38746, 94345)){
         }
         
         #------------output
-        a = sum(letti - final$n_patient_im_in  > 1, na.rm=T) #quante mezzore con più di 1 letto vuoto (Male)
-        c = sum(final$n_patient_im_out == 1 , na.rm=T) #quante mezzore abbiamo occupato almeno 1 letto fuori
+        final$empty = letti - final$n_patient_im_in
+        a = sum(final[final$empty  > 1, "empty"], na.rm=T)# letti vuoti per 10 minuti
+        
+        
+        a1 = sum(final$empty > 1 & final$empty <=5, na.rm=T) #quanti periodi con più di 1 letto vuoto (Male)
+        a2 = sum(final$empty > 5 & final$empty <=10, na.rm=T)
+        a3 = sum(final$empty > 10 & final$empty <=15, na.rm=T)
+        a4 = sum(final$empty > 15 & final$empty <=20, na.rm=T)
+        a5 = sum(final$empty > 20, na.rm=T)
+        
+        
+        c = sum(final$n_patient_im_out == 1 , na.rm=T) #quanti periodi abbiamo occupato almeno 1 letto fuori
         d = sum(final$n_patient_im_out == 2 , na.rm=T) 
         e = sum(final$n_patient_im_out == 3 , na.rm=T)
         f = sum(final$n_patient_im_out >= 4 , na.rm=T)
-        
+        tot = sum(final$n_patient_im_out)
         #------------print
+        
         print(c(
           round(seed_n,0),
           round(interarrivi,0),
@@ -86,6 +100,12 @@ for (seed_n in c(12345, 1, 1991, 300, 38746, 94345)){
           round(max(final$n_patient_im_in+final$n_patient_im_out),0), #max letti per periodo
           round(sum(simulation_full$transfer, na.rm=T),0), #trasferiti
           round(a,0),
+          round(a1,0),
+          round(a2,0),
+          round(a3,0),
+          round(a4,0),
+          round(a5,0),
+          round(tot,0),
           round(c,0),
           round(d,0),
           round(e,0),
