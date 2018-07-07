@@ -2,8 +2,7 @@ library("lubridate")
 library("dplyr")
 library("reshape2")
 library("ggplot2")
-library("doParallel")
-library("foreach")
+
 
 source("C:\\Users\\Giacomo Monti\\Desktop\\decision model\\final projects\\funzioni_decision_model.R")
 
