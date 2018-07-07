@@ -27,7 +27,7 @@ for (seed_n in c(12345)){
 #         
         
         #------------simulation
-        simulation = simulate_arrival(start = "2018-01-12 00:05:00", n_days=48,
+        simulation = simulate_arrival(start = "2018-05-20 00:05:00", n_days=50,
                                       lambda_interarrivi=1/interarrivi  , 
                                       lambda_surgery = 1/74 ,
                                       lambda_los = 1/1838,
@@ -46,12 +46,12 @@ for (seed_n in c(12345)){
         
         simulation_full$waiting_time = difftime(simulation_full$admission , simulation_full$start_waiting, 
                                                 units = "mins")
-        simulation_full = simulation_full [simulation_full$arrival_date_time >= ymd_hms("2018-02-01 00:00:00"), ]
+        #simulation_full = simulation_full [simulation_full$arrival_date_time >= ymd_hms("2018-02-01 00:00:00"), ]
         
         
         
         #------------periodi
-        hour_series = seq(ymd_hms('2018-02-01 00:00:00'), ymd_hms('2018-03-01 23:00:00'), by = '10 min')  
+        hour_series = seq(ymd_hms('2018-05-20 00:05:00'), ymd_hms('2018-07-10 23:00:00'), by = '10 min')  
         final = data.frame(date_time = hour_series)
         
         for (i in seq_along(final$date_time)){
@@ -65,6 +65,10 @@ for (seed_n in c(12345)){
             length(simulation_full[simulation_full$admission <= j & simulation_full$leave > j &
                                      simulation_full$transfer == TRUE ,"patient_id"])
         }
+        
+        
+        final = final [final$date_time >= ymd_hms("2018-06-01 00:00:00")
+                       & final$date_time < ymd_hms("2018-07-01 00:00:00"), ]
         
         #------------output
         final$empty = letti - final$n_patient_im_in
