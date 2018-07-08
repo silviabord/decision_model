@@ -23,7 +23,7 @@ simulate_arrival=function(start = "2018-01-01 00:05:00", n_days=45,
   while (arrival < start+days(n_days)) {
     
     #stime 
-   
+    
     rexp_interarrival = round(rexp(1,lambda_interarrivi),0)
     rexp_surgery = max(50, round(rexp(1,lambda_surgery),0))
     rexp_los = round(rexp(1,lambda_los),0)
@@ -126,7 +126,7 @@ simulate_recovery = function(
     if(any(attesa>=max_attesa)){
       #print(attesa)
       trasferimenti = ready2[attesa>=max_attesa,]
-      #sistemare se ci sono piÃ¹ di 1 paziente per match giusto
+      #sistemare se ci sono più di 1 paziente per match giusto
       simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"admission"] = date
       simulation_full[simulation_full$patient_id %in% trasferimenti$patient_id,"leave"] =
         date + minutes(trasferimenti$los)
