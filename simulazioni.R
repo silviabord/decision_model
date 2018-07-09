@@ -13,17 +13,12 @@ source("C:\\Users\\Silvia Bordogna\\Desktop\\decision model\\final projects\\fun
 #   funzione con parametri  #
 #############################
 
-seed_n=12345
-interarrivi=115
-letti=23
-attesa=60
-
 sink("simulation_output.txt")
 
-for (seed_n in c(12345)){
-  for (interarrivi in c(115)) {
-    for (letti in c(seq(17,30))){
-      for (attesa in c(60)){
+for (seed_n in c(12345, 94345, 78965, 43985, 94565)){
+  for (interarrivi in c(115, 98, 133)) {
+    for (letti in c(7, 10, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30)){
+      for (attesa in c(50, 60, 65, 70, 90)){
         
       
 # for (seed_n in c(12345)){
@@ -79,7 +74,7 @@ for (seed_n in c(12345)){
         a = sum(final[final$empty  > 1, "empty"], na.rm=T)# letti vuoti per 10 minuti
         
         
-        a1 = sum(final$empty > 1 & final$empty <=5, na.rm=T) #quanti periodi con più di 1 letto vuoto (Male)
+        a1 = sum(final$empty > 1 & final$empty <=5, na.rm=T) #quanti periodi con piÃ¹ di 1 letto vuoto (Male)
         a2 = sum(final$empty > 5 & final$empty <=10, na.rm=T)
         a3 = sum(final$empty > 10 & final$empty <=15, na.rm=T)
         a4 = sum(final$empty > 15 & final$empty <=20, na.rm=T)
@@ -153,7 +148,7 @@ ggplot(data = df, aes(letti,obj, col=Interarrivi))+
   theme(legend.position="bottom",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())+
-  xlab("N° Letti")+
+  xlab("NÂ° Letti")+
   ylab("Funzione Obiettivo")+
   labs(subtitle = "Tempo Attesa Max")
 
@@ -167,7 +162,7 @@ ggplot(data = df%>%filter(attesa==60), aes(letti, obj,col=Interarrivi))+
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())+
   scale_x_continuous(breaks = pretty(df$letti, n = 10))+
-  xlab("N° Letti")+
+  xlab("NÂ° Letti")+
   ylab("Funzione Obiettivo")
 
 
@@ -179,7 +174,7 @@ ggplot(data = df, aes(letti,obj, col=Attesa))+
   theme(legend.position="bottom",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())+
-  xlab("N° Letti")+
+  xlab("NÂ° Letti")+
   ylab("Funzione Obiettivo")+
   labs(subtitle = "Tempo Interarrivi")
 
@@ -190,7 +185,7 @@ ggplot(data = df, aes(as.factor(letti), obj, col=Interarrivi))+
   geom_boxplot(outlier.shape = NA)+
   theme(legend.position="bottom",
         panel.grid.major.x = element_blank())+
-  xlab("N° Letti")+
+  xlab("NÂ° Letti")+
   ylab("Funzione Obiettivo")
 
 
@@ -202,7 +197,7 @@ ggplot(data = df, aes(letti,obj, col=Interarrivi))+
   theme(legend.position="bottom",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())+
-  xlab("N° Letti")+
+  xlab("NÂ° Letti")+
   ylab("Funzione Obiettivo")+
   labs(subtitle = "Tempo Attesa Max")
 
