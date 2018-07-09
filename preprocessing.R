@@ -1,5 +1,5 @@
 #############################################
-#########       decision model       ########
+#####   decision model preprocessing   ######
 #############################################
 
 library("lubridate")
@@ -7,8 +7,8 @@ library("dplyr")
 library("reshape2")
 library("ggplot2")
 
-historical_info <- read.csv("C:/Users/Silvia Bordogna/Desktop/decision model/final projects/historical_info.csv", sep=";", stringsAsFactors=FALSE)
-patients <- read.delim2("C:/Users/Silvia Bordogna/Desktop/decision model/final projects/patients.csv", stringsAsFactors=FALSE)
+historical_info <- read.csv("C:/Users/sdara/Decision Model/Progetto_Finale/decision_model-master/historical_info.csv", sep=";", stringsAsFactors=FALSE)
+patients <- read.delim2("C:/Users/sdara/Decision Model/Progetto_Finale/decision_model-master/patients.csv", stringsAsFactors=FALSE)
 
 
 #############################################
@@ -27,8 +27,6 @@ patients$arrival_hour = as.numeric(hour(patients$arrival_time))
 
 patients$waiting_time_round = round(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
 patients$Arrival.Time=NULL
-#patients$bed_date = patients$arrival_date
-#patients[hour(patients$arrival_date_time)>12, "bed_date"] = patients[hour(patients$arrival_date_time)>12, "arrival_date"]+1
 
 patients = patients[order(patients$arrival_date_time),] 
 patients$arrival_date_time_t0 = lag(patients$arrival_date_time)
@@ -38,7 +36,6 @@ patients$minutes_to_next = difftime(patients$arrival_date_time,patients$arrival_
 
 set.seed(1234)
 #decidere parametro exp negativa >> 1/media
-#mean(patients$Length_of_Stay_day)
 patients$rexp = rexp( dim(patients)[1] , 1/0.5)
 patients$rexp_round = floor(patients$rexp)
 patients$rexp_decimal = patients$rexp-patients$rexp_round
@@ -60,9 +57,6 @@ patients = patients[order(patients$leave_date_time),]
 patients$leave_date_time_t0 = lag(patients$leave_date_time)
 patients$hours_to_next_leave = difftime(patients$leave_date_time,patients$leave_date_time_t0, units = "hour")
 patients$minutes_to_next_leave = difftime(patients$leave_date_time,patients$leave_date_time_t0, units = "min")
-
-
-
 
 
 
@@ -118,12 +112,6 @@ mean(as.numeric(patients$minutes_to_next_leave), na.rm = T)
 
 
 
-
-
-
-
-
-
 ##############################################################
 ############           data exploration           ############
 ##############################################################
@@ -140,9 +128,6 @@ max(historical_info$Date)
 max(patients$Arrival_Date)
 #min(patients$Arrival_Date)
 
-# che cazzo sono other other
-table(patients$Section, patients$Surgery_Type)
-
 ###################pazienti arrivano a qualunque ora equiprobabilmente###################
 barplot(prop.table(table(hour(patients$arrival_time))),main = "arrival_time")
 
@@ -150,7 +135,7 @@ barplot(prop.table(table(hour(patients$leave_date_time))),main = "leave_time")
 
 ###################pazienti arrivano in qualunque giorno equiprobabilmente###################
 patients$dow = factor(weekdays(patients$arrival_date), ordered=T,
-                      levels=c("lunedì","martedì","mercoledì","giovedì","venerdì","sabato","domenica")) 
+                      levels=c("lunedÃ¬","martedÃ¬","mercoledÃ¬","giovedÃ¬","venerdÃ¬","sabato","domenica")) 
 barplot(prop.table(table(patients$dow)),main = "dow")
 
 
@@ -194,70 +179,6 @@ mean(patients$Length_of_Stay_day)
 
 
 
-
-
-
-
-######################################################################################          
-############     check se con los stimato si replicano dati historical           #####
-######################################################################################          
-
-# hour_series = seq(ymd_hms('2015-01-02 00:00:00'), ymd_hms('2015-10-30 23:00:00'), by = '30 min')  
-# final = data.frame(date_time = hour_series)
-# 
-# 
-# timestamp()
-# for (i in seq_along(final$date_time)){
-#   j = final$date_time[i]
-#   
-#   final[i,"n_patient_im_in"] = 
-#     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
-#                       patients$Surgery_Type == "Internal_Medicine" &
-#                       patients$Section == "8000595","Patient_ID"])
-#   
-#   final[i,"n_patient_im_out"] = 
-#     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
-#                       patients$Surgery_Type == "Internal_Medicine" &
-#                       patients$Section == "other","Patient_ID"])
-#   
-#   final[i,"n_patient_other_in"] = 
-#     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
-#                       patients$Surgery_Type == "Others" &
-#                       patients$Section == "8000595","Patient_ID"])
-#   
-#   final[i,"n_patient_other_out"] = 
-#     length(patients[patients$arrival_date_time <= j & patients$leave_date_time > j &
-#                       patients$Surgery_Type == "Others" &
-#                       patients$Section == "other","Patient_ID"])
-#   print(i)
-# }
-# 
-# ###################   controllo se i dati tornano con historical   ###################
-# plot(final$n_patient_im_in+final$n_patient_other_in, type="l")
-# abline(h = 19, col=2)
-# 
-# check = final %>% filter(hour(final$date_time)==00)
-# check$date = ymd(floor_date(check$date_time, unit = c("day")))
-# check$recovery = check$n_patient_im_in
-# #+ check$n_patient_other_in
-# #+check$n_patient_other_in
-# check_2= merge(check,  historical_info, by.x = "date", by.y = "Date")
-# 
-# #errore stima con historical
-# sqrt(sum((check_2$patients-check_2$recovery)^2)/dim(check_2)[1])
-# #sum(abs(check_2$recovery-check_2$patients))/dim(check_2)[1]
-# 
-# #plot(historical_info$patients, type="l")
-# plot(check$recovery, type="l", lwd = 1, lambda=0.9)
-# abline(h = 19, col=2)
-# abline(h = mean(check$recovery))
-# lines(historical_info$patients,col="blue",type="l")
-# abline(h = mean(historical_info$patients) ,col="blue")
-# legend(0, 27, legend=c("Estimate", "Historical"),
-#        col=c("black", "blue"), lty=1, cex=0.6, bty="n")
-# 
-
-
 #################################
 ####       Simulazione       ####
 #################################
@@ -265,19 +186,11 @@ mean(patients$Length_of_Stay_day)
 hist(patients$minutes_to_next)
 lambda_interarrivi = 1/as.numeric(mean(patients$minutes_to_next, na.rm=T))
 hist(rexp(200,lambda_interarrivi))
-#aumentare media arrivi
 
 hist(patients$Surgery_Time_min)
 lambda_surgery = 1/as.numeric(mean(patients$Surgery_Time_min, na.rm=T))
 hist(rexp(200,lambda_surgery))
 
-#hist(patients$POST_ANESTHESIA_CARE_UNIT_Time_min)
-#lambda_waiting = 1/as.numeric(mean(patients$POST_ANESTHESIA_CARE_UNIT_Time_min, na.rm=T))
-#hist(rexp(200,lambda_waiting))
-
 hist(patients$los_estimate)
 lambda_los = 1/as.numeric(mean(patients$los_estimate, na.rm=T))
 hist(rexp(200,lambda_los))
-
-
-
