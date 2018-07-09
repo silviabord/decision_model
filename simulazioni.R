@@ -28,7 +28,7 @@ for (seed_n in c(12345, 94345, 78965, 43985, 94565)){
 #         
         
         #------------simulation
-        simulation = simulate_arrival(start = "2018-05-20 00:05:00", n_days=50,
+        simulation = simulate_arrival(start = "2018-05-20 00:05:00", n_days=70,
                                       lambda_interarrivi=1/interarrivi  , 
                                       lambda_surgery = 1/74 ,
                                       lambda_los = 1/1838,
